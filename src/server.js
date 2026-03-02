@@ -924,10 +924,29 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       // Ignore errors - openclaw.json may not exist yet
     }
 
+    // Helper function to get Railway public domain from various environment variables
+    // Railway may not always set RAILWAY_PUBLIC_DOMAIN, so we try multiple sources
+    function getRailwayDomainOnboard() {
+      // Try standard Railway variables first
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) return process.env.RAILWAY_PUBLIC_DOMAIN;
+      if (process.env.RAILWAY_STATIC_URL) return process.env.RAILWAY_STATIC_URL;
+
+      // Try service-specific URL variables (e.g., RAILWAY_SERVICE_OPENCLAW_RAILWAY_TEMPLATE_URL)
+      for (const key of Object.keys(process.env)) {
+        if (key.startsWith("RAILWAY_SERVICE_") && key.endsWith("_URL")) {
+          const url = process.env[key];
+          if (url && (url.includes(".up.railway.app") || url.includes(".railway.app"))) {
+            return url;
+          }
+        }
+      }
+      return null;
+    }
+
     // Fix controlUi.allowedOrigins for Railway deployments
     // Allow common Railway domains and localhost for development
     // Note: OpenClaw does exact origin matching, not wildcard matching
-    const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+    const railwayDomainOnboard = getRailwayDomainOnboard();
     const allowedOrigins = [
       "http://localhost:*",
       "http://127.0.0.1:*",
@@ -935,8 +954,10 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
       "https://*.railway.app",
     ];
     // Add exact Railway domain if available (required because wildcard doesn't work)
-    if (railwayDomain) {
-      allowedOrigins.push(`https://${railwayDomain}`);
+    if (railwayDomainOnboard) {
+      // Strip protocol if present
+      const domain = railwayDomainOnboard.replace(/^https?:\/\//, "");
+      allowedOrigins.push(`https://${domain}`);
     }
     const allowedOriginsCfg = JSON.stringify(allowedOrigins);
     await runCmd(
@@ -1514,11 +1535,30 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
     }
 
+    // Helper function to get Railway public domain from various environment variables
+    // Railway may not always set RAILWAY_PUBLIC_DOMAIN, so we try multiple sources
+    function getRailwayDomain() {
+      // Try standard Railway variables first
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) return process.env.RAILWAY_PUBLIC_DOMAIN;
+      if (process.env.RAILWAY_STATIC_URL) return process.env.RAILWAY_STATIC_URL;
+
+      // Try service-specific URL variables (e.g., RAILWAY_SERVICE_OPENCLAW_RAILWAY_TEMPLATE_URL)
+      for (const key of Object.keys(process.env)) {
+        if (key.startsWith("RAILWAY_SERVICE_") && key.endsWith("_URL")) {
+          const url = process.env[key];
+          if (url && (url.includes(".up.railway.app") || url.includes(".railway.app"))) {
+            return url;
+          }
+        }
+      }
+      return null;
+    }
+
     // Fix controlUi.allowedOrigins on every startup (not just after onboard)
     // This ensures Railway domains are allowed even for existing deployments
     // Note: OpenClaw does exact origin matching, not wildcard matching, so we must add the exact domain
     try {
-      const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
+      const railwayDomain = getRailwayDomain();
       const allowedOrigins = [
         "http://localhost:*",
         "http://127.0.0.1:*",
@@ -1527,7 +1567,13 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       ];
       // Add exact Railway domain if available (required because wildcard doesn't work)
       if (railwayDomain) {
-        allowedOrigins.push(`https://${railwayDomain}`);
+        // Strip protocol if present
+        const domain = railwayDomain.replace(/^https?:\/\//, "");
+        allowedOrigins.push(`https://${domain}`);
+      } else {
+        // Debug: log available Railway-related env vars if no domain found
+        const railwayVars = Object.keys(process.env).filter(k => k.startsWith("RAILWAY"));
+        console.log(`[wrapper] No Railway domain found. Available RAILWAY vars: ${railwayVars.join(", ")}`);
       }
       await runCmd(
         OPENCLAW_NODE,
