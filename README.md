@@ -31,6 +31,10 @@ Required:
 Recommended:
 - `OPENCLAW_STATE_DIR=/data/.openclaw`
 - `OPENCLAW_WORKSPACE_DIR=/data/workspace`
+- `OPENCLAW_GIT_REF=v2026.2.26` — OpenClaw version to build (optional, defaults to a recent release)
+
+If using **MiniMax M2.5** as the AI model:
+- `MINIMAX_API_KEY=<your MiniMax API key>` — Get from https://platform.minimaxi.com
 
 Optional:
 - `OPENCLAW_GATEWAY_TOKEN` — if not set, the wrapper generates one (not ideal). In a template, set it using a generated secret.
@@ -38,15 +42,30 @@ Optional:
 Notes:
 - This template pins OpenClaw to a released version by default via Docker build arg `OPENCLAW_GIT_REF` (override if you want `main`).
 
-4) Enable **Public Networking** (HTTP). Railway will assign a domain.
+4) **Important:** In Railway, go to **Settings → Networking** and click **Generate Domain** to apply for a public domain.
+   - This step is required! Without a public domain, the `RAILWAY_PUBLIC_DOMAIN` environment variable will not be set, and the Control UI will show "origin not allowed" errors.
+   - Railway will assign a domain like `your-app.up.railway.app`.
+5) Enable **Public Networking** (HTTP).
    - This service listens on Railway’s injected `PORT` at runtime (recommended).
-5) Deploy.
+6) Deploy.
 
 Then:
 - Visit `https://<your-app>.up.railway.app/setup`
   - Your browser will prompt for **HTTP Basic auth**. Use any username; the password is `SETUP_PASSWORD`.
 - Complete setup
 - Visit `https://<your-app>.up.railway.app/` and `/openclaw` (same Basic auth)
+
+### Authorizing the Control UI
+
+After setup, you need to authorize the Control UI to connect to the gateway:
+
+1. Open the Control UI at `https://<your-app>.up.railway.app/openclaw`
+2. Your browser will show "pairing required" - this is expected
+3. Go to `/setup` → Use the **Debug Console** to run:
+   - `openclaw devices list` — shows pending device requests
+   - `openclaw devices approve <requestId>` — approves the request
+
+Alternatively, you can approve pairing requests via Telegram or Discord if you have configured those channels.
 
 ## Support / community
 
@@ -106,6 +125,29 @@ mkdir -p /data/npm /data/npm-cache /data/pnpm /data/pnpm-store
 ```
 
 ## Troubleshooting
+
+### “origin not allowed” error when accessing Control UI
+
+This error occurs because the gateway's `controlUi.allowedOrigins` config doesn't include your Railway domain.
+
+**Root cause:** OpenClaw does exact origin matching, not wildcard matching. Even though `https://*.up.railway.app` is in the allowed list, the exact domain must also be present.
+
+**Fix:**
+1. Make sure you have applied for a public domain in **Railway → Settings → Networking** (click “Generate Domain”)
+2. The wrapper should automatically sync your domain on startup. If not, you can manually add it:
+
+```bash
+# SSH into your Railway service
+railway ssh --project=<project-id> --service=<service-id>
+
+# Add your domain to allowedOrigins
+openclaw config set --json gateway.controlUi.allowedOrigins '[“http://localhost:*”, “http://127.0.0.1:*”, “https://*.up.railway.app”, “https://*.railway.app”, “https://your-app.up.railway.app”]'
+
+# Restart the gateway
+pkill -f openclaw-gateway
+```
+
+Then access the Control UI again to trigger gateway restart.
 
 ### “disconnected (1008): pairing required” / dashboard health offline
 
