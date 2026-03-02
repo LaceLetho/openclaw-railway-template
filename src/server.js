@@ -874,6 +874,40 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     // Doctor may require a restart depending on changes.
     await restartGateway();
+
+    // Fix minimax baseUrl in models.json (workaround for openclaw bug #15275)
+    // The models.json may have wrong baseUrl (.io) instead of the correct one (.com)
+    // This fix ensures the correct baseUrl is used after onboarding.
+    const modelsJsonPath = path.join(STATE_DIR, "agents", "main", "agent", "models.json");
+    try {
+      const modelsContent = fs.readFileSync(modelsJsonPath, "utf8");
+      const models = JSON.parse(modelsContent);
+      if (models.providers?.minimax?.baseUrl === "https://api.minimax.io/anthropic") {
+        models.providers.minimax.baseUrl = "https://api.minimaxi.com/anthropic";
+        fs.writeFileSync(modelsJsonPath, JSON.stringify(models, null, 2) + "\n", "utf8");
+        extra += "\n[minimax baseUrl fix] corrected models.json baseUrl from .io to .com\n";
+      }
+    } catch {
+      // Ignore errors - models.json may not exist yet
+    }
+
+    // Also fix minimax baseUrl in main openclaw.json config file
+    const mainConfigPath = path.join(STATE_DIR, "openclaw.json");
+    try {
+      const mainConfigContent = fs.readFileSync(mainConfigPath, "utf8");
+      const mainConfig = JSON.parse(mainConfigContent);
+      let mainConfigChanged = false;
+      if (mainConfig.models?.providers?.minimax?.baseUrl === "https://api.minimax.io/anthropic") {
+        mainConfig.models.providers.minimax.baseUrl = "https://api.minimaxi.com/anthropic";
+        mainConfigChanged = true;
+      }
+      if (mainConfigChanged) {
+        fs.writeFileSync(mainConfigPath, JSON.stringify(mainConfig, null, 2) + "\n", "utf8");
+        extra += "\n[minimax baseUrl fix] corrected openclaw.json baseUrl from .io to .com\n";
+      }
+    } catch {
+      // Ignore errors - openclaw.json may not exist yet
+    }
   }
 
   return respondJson(ok ? 200 : 500, {
