@@ -1492,6 +1492,24 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
     }
+
+    // Fix controlUi.allowedOrigins on every startup (not just after onboard)
+    // This ensures Railway domains are allowed even for existing deployments
+    try {
+      const allowedOrigins = [
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "https://*.up.railway.app",
+        "https://*.railway.app",
+      ];
+      await runCmd(
+        OPENCLAW_NODE,
+        clawArgs(["config", "set", "--json", "gateway.controlUi.allowedOrigins", JSON.stringify(allowedOrigins)]),
+      );
+      console.log("[wrapper] allowedOrigins synced");
+    } catch (err) {
+      console.warn(`[wrapper] failed to sync allowedOrigins: ${String(err)}`);
+    }
   }
 
   // Auto-start the gateway if already configured so polling channels (Telegram/Discord/etc.)
