@@ -926,12 +926,18 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
 
     // Fix controlUi.allowedOrigins for Railway deployments
     // Allow common Railway domains and localhost for development
+    // Note: OpenClaw does exact origin matching, not wildcard matching
+    const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
     const allowedOrigins = [
       "http://localhost:*",
       "http://127.0.0.1:*",
       "https://*.up.railway.app",
       "https://*.railway.app",
     ];
+    // Add exact Railway domain if available (required because wildcard doesn't work)
+    if (railwayDomain) {
+      allowedOrigins.push(`https://${railwayDomain}`);
+    }
     const allowedOriginsCfg = JSON.stringify(allowedOrigins);
     await runCmd(
       OPENCLAW_NODE,
@@ -1510,13 +1516,19 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
 
     // Fix controlUi.allowedOrigins on every startup (not just after onboard)
     // This ensures Railway domains are allowed even for existing deployments
+    // Note: OpenClaw does exact origin matching, not wildcard matching, so we must add the exact domain
     try {
+      const railwayDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
       const allowedOrigins = [
         "http://localhost:*",
         "http://127.0.0.1:*",
         "https://*.up.railway.app",
         "https://*.railway.app",
       ];
+      // Add exact Railway domain if available (required because wildcard doesn't work)
+      if (railwayDomain) {
+        allowedOrigins.push(`https://${railwayDomain}`);
+      }
       await runCmd(
         OPENCLAW_NODE,
         clawArgs(["config", "set", "--json", "gateway.controlUi.allowedOrigins", JSON.stringify(allowedOrigins)]),
