@@ -908,6 +908,21 @@ app.post("/setup/api/run", requireSetupAuth, async (req, res) => {
     } catch {
       // Ignore errors - openclaw.json may not exist yet
     }
+
+    // Fix controlUi.allowedOrigins for Railway deployments
+    // Allow common Railway domains and localhost for development
+    const allowedOrigins = [
+      "http://localhost:*",
+      "http://127.0.0.1:*",
+      "https://*.up.railway.app",
+      "https://*.railway.app",
+    ];
+    const allowedOriginsCfg = JSON.stringify(allowedOrigins);
+    await runCmd(
+      OPENCLAW_NODE,
+      clawArgs(["config", "set", "--json", "gateway.controlUi.allowedOrigins", allowedOriginsCfg]),
+    );
+    extra += `\n[controlUi] allowedOrigins set to ${allowedOriginsCfg}\n`;
   }
 
   return respondJson(ok ? 200 : 500, {
