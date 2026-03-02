@@ -150,14 +150,19 @@ function sleep(ms) {
 async function waitForGatewayReady(opts = {}) {
   const timeoutMs = opts.timeoutMs ?? 20_000;
   const start = Date.now();
+  // Gateway requires token auth - include it in health check requests.
+  const authHeader = `Bearer ${OPENCLAW_GATEWAY_TOKEN}`;
   while (Date.now() - start < timeoutMs) {
     try {
       // Try the default Control UI base path, then fall back to root.
       const paths = ["/openclaw", "/"];
       for (const p of paths) {
         try {
-          const res = await fetch(`${GATEWAY_TARGET}${p}`, { method: "GET" });
-          // Any HTTP response means the port is open.
+          const res = await fetch(`${GATEWAY_TARGET}${p}`, {
+            method: "GET",
+            headers: { Authorization: authHeader },
+          });
+          // Any HTTP response means the port is open and gateway is responding.
           if (res) return true;
         } catch {
           // try next
@@ -240,6 +245,16 @@ async function ensureGatewayRunning() {
         await startGateway();
         const ready = await waitForGatewayReady({ timeoutMs: 20_000 });
         if (!ready) {
+          // Gateway process started but didn't become ready in time.
+          // Kill it so subsequent calls will retry starting a fresh gateway.
+          if (gatewayProc) {
+            try {
+              gatewayProc.kill("SIGTERM");
+            } catch {
+              // ignore
+            }
+            gatewayProc = null;
+          }
           throw new Error("Gateway did not become ready in time");
         }
       } catch (err) {
