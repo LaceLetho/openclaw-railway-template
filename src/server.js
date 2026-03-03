@@ -546,6 +546,9 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
 });
 
 const AUTH_GROUPS = [
+  { value: "skip", label: "Skip auth (use env vars)", hint: "Don't configure auth - set MINIMAX_API_KEY etc. in Railway vars", options: [
+    { value: "skip", label: "Skip auth (read from environment variables)" }
+  ]},
   { value: "openai", label: "OpenAI", hint: "Codex OAuth + API key", options: [
     { value: "codex-cli", label: "OpenAI Codex OAuth (Codex CLI)" },
     { value: "openai-codex", label: "OpenAI Codex (ChatGPT OAuth)" },
