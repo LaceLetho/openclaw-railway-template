@@ -17,3 +17,4 @@ npm-debug.log*
 CLAUDE.md
 .claude/
 openclaw-railway-template.code-workspace
+.playwright-mcp
