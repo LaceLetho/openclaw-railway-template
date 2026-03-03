@@ -454,31 +454,7 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
   </div>
 
   <div class="card">
-    <h2>1) Model/auth provider</h2>
-    <p class="muted">Matches the groups shown in the terminal onboarding.</p>
-    <label>Provider group</label>
-    <select id="authGroup">
-      <option>Loading providers…</option>
-    </select>
-
-    <label>Auth method</label>
-    <select id="authChoice">
-      <option>Loading methods…</option>
-    </select>
-
-    <label>Key / Token (if required)</label>
-    <input id="authSecret" type="password" placeholder="Paste API key / token if applicable" />
-
-    <label>Wizard flow</label>
-    <select id="flow">
-      <option value="quickstart">quickstart</option>
-      <option value="advanced">advanced</option>
-      <option value="manual">manual</option>
-    </select>
-  </div>
-
-  <div class="card">
-    <h2>2) Optional: Channels</h2>
+    <h2>1) Optional: Channels</h2>
     <p class="muted">You can also add channels later inside OpenClaw, but this helps you get messaging working immediately.</p>
 
     <label>Telegram bot token (optional)</label>
@@ -636,47 +612,8 @@ function buildOnboardArgs(payload) {
     payload.flow || "quickstart",
   ];
 
-  if (payload.authChoice) {
-    args.push("--auth-choice", payload.authChoice);
-
-    // Map secret to correct flag for common choices.
-    const secret = (payload.authSecret || "").trim();
-    const map = {
-      "openai-api-key": "--openai-api-key",
-      "apiKey": "--anthropic-api-key",
-      "openrouter-api-key": "--openrouter-api-key",
-      "ai-gateway-api-key": "--ai-gateway-api-key",
-      "moonshot-api-key": "--moonshot-api-key",
-      "kimi-code-api-key": "--kimi-code-api-key",
-      "gemini-api-key": "--gemini-api-key",
-      "zai-api-key": "--zai-api-key",
-      "minimax-api": "--minimax-api-key",
-      "minimax-api-lightning": "--minimax-api-key",
-      "synthetic-api-key": "--synthetic-api-key",
-      "opencode-zen": "--opencode-zen-api-key",
-    };
-
-    const flag = map[payload.authChoice];
-
-    // If the user picked an API-key auth choice but didn't provide a secret, fail fast.
-    // Otherwise OpenClaw may fall back to its default auth choice, which looks like the
-    // wizard "reverted" their selection.
-    if (flag && !secret) {
-      throw new Error(`Missing auth secret for authChoice=${payload.authChoice}`);
-    }
-
-    // Only pass API key flag if user actually provided a secret.
-    // If secret is empty, let OpenClaw read from environment variables.
-    if (flag && secret) {
-      args.push(flag, secret);
-    }
-
-    if (payload.authChoice === "token") {
-      // This is the Anthropic setup-token flow.
-      if (!secret) throw new Error("Missing auth secret for authChoice=token");
-      args.push("--token-provider", "anthropic", "--token", secret);
-    }
-  }
+  // Default to "skip" auth - users configure API keys via environment variables instead of wizard.
+  args.push("--auth-choice", "skip");
 
   return args;
 }

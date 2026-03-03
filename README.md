@@ -33,8 +33,65 @@ Recommended:
 - `OPENCLAW_WORKSPACE_DIR=/data/workspace`
 - `OPENCLAW_GIT_REF=v2026.2.26` — OpenClaw version to build (optional, defaults to a recent release)
 
-If using **MiniMax M2.5** as the AI model:
-- `MINIMAX_API_KEY=<your MiniMax API key>` — Get from https://platform.minimaxi.com
+## LLM Provider Configuration
+
+This template uses **environment variables** to configure the LLM provider instead of the wizard. This is more secure and flexible.
+
+### Supported Providers
+
+Set one or more of the following environment variables in Railway:
+
+| Provider | Environment Variable | Model (default) |
+|----------|---------------------|-----------------|
+| MiniMax M2.1 | `MINIMAX_API_KEY` | MiniMax-M2.1 |
+| MiniMax M2.1 Lightning | `MINIMAX_API_KEY` | MiniMax-M2.1-Lightning |
+| OpenAI | `OPENAI_API_KEY` | gpt-4o |
+| Anthropic | `ANTHROPIC_API_KEY` | claude-sonnet-4-20250514 |
+| Google Gemini | `GEMINI_API_KEY` | gemini-2.0-flash |
+| OpenRouter | `OPENROUTER_API_KEY` | openai/gpt-4o |
+| Moonshot AI (Kimi) | `MOONSHOT_API_KEY` | moonshot-v1-8k |
+| Kimi Code | `KIMI_CODE_API_KEY` | kimi-coder |
+| Z.AI (GLM 4.7) | `ZAI_API_KEY` | glm-4 |
+| Vercel AI Gateway | `AI_GATEWAY_API_KEY` + `AI_GATEWAY_ACCOUNT_ID` + `AI_GATEWAY_GATEWAY_ID` | - |
+| Custom Provider | See below | - |
+
+### Example: MiniMax (Recommended)
+
+1. Get an API key from https://platform.minimaxi.com
+2. In Railway, add variable: `MINIMAX_API_KEY=<your key>`
+3. Deploy and run `/setup` — the wizard now skips auth and uses the env var automatically
+
+### Example: OpenAI
+
+1. Get an API key from https://platform.openai.com
+2. In Railway, add variable: `OPENAI_API_KEY=<your key>`
+3. Deploy and run `/setup`
+
+### Custom Provider
+
+To use a custom LLM provider:
+
+1. Set these Railway variables:
+   - `CUSTOM_PROVIDER_ID=my-provider`
+   - `CUSTOM_BASE_URL=https://api.example.com/v1`
+   - `CUSTOM_API_KEY=<your key>`
+   - `CUSTOM_MODEL_ID=gpt-4`
+   - `CUSTOM_API=openai` (or `anthropic`)
+
+2. Run `/setup` — the wizard will add your custom provider
+
+### Switching Providers
+
+To switch providers after initial setup:
+
+1. Update the environment variable in Railway
+2. Edit the model in `/data/.openclaw/agents/main/agent/models.json` or use:
+   ```bash
+   openclaw config set models.defaultProvider=<provider-id>
+   ```
+3. Restart the gateway from `/setup` Debug Console
+
+### Other Optional Variables
 
 Optional:
 - `OPENCLAW_GATEWAY_TOKEN` — if not set, the wrapper generates one (not ideal). In a template, set it using a generated secret.
