@@ -176,7 +176,7 @@ If you see "origin not allowed" in the Control UI:
 
 ```bash
 # Add your Railway domain to allowed origins
-openclaw config set --json gateway.controlUi.allowedOrigins '["http://localhost:*", "http://127.0.0.1:*", "https://*.up.railway.app", "https://*.railway.app", "https://your-app.up.railway.app"]'
+openclaw config set --json gateway.controlUi.allowedOrigins '["https://your-app.up.railway.app"]'
 
 # Restart the gateway
 pkill -f openclaw-gateway
