@@ -453,13 +453,6 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
     <pre id=”configOut” style=”white-space:pre-wrap”></pre>
   </div>
 
-  <div class=”card”>
-    <h2>Run setup</h2>
-    <p class=”muted”>Run OpenClaw onboard. Auth is configured via Railway environment variables (e.g. MINIMAX_API_KEY).</p>
-    <button id=”run” style=”background:#111”>Run setup</button>
-    <pre id=”log” style=”white-space:pre-wrap”></pre>
-  </div>
-
   <script src=”/setup/app.js”></script>
 </body>
 </html>`);
