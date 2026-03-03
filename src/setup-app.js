@@ -37,6 +37,9 @@
   }
 
   function renderAuth(groups) {
+    // Skip rendering auth UI if elements don't exist (auth now handled via env vars)
+    if (!authGroupEl || !authChoiceEl) return;
+
     authGroupEl.innerHTML = '';
 
     // Toggle for showing interactive OAuth choices.
@@ -136,7 +139,11 @@
   }
 
   // Fast auth group load (no subprocesses). Keeps selects from appearing empty.
+  // Skip if auth elements don't exist (auth now handled via env vars).
   function loadAuthGroupsFast() {
+    // Skip if auth UI elements don't exist
+    if (!authGroupEl || !authChoiceEl) return Promise.resolve();
+
     return httpJson('/setup/api/auth-groups').then(function (j) {
       if (j && j.authGroups && j.authGroups.length > 0) {
         renderAuth(j.authGroups);
@@ -151,9 +158,10 @@
 
   document.getElementById('run').onclick = function () {
     var payload = {
-      flow: document.getElementById('flow').value,
-      authChoice: authChoiceEl.value,
-      authSecret: document.getElementById('authSecret').value,
+      // Auth is now handled via environment variables, not wizard
+      // flow: removed (using default quickstart)
+      // authChoice: removed (using --auth-choice skip)
+      // authSecret: removed (using env vars)
       telegramToken: document.getElementById('telegramToken').value,
       discordToken: document.getElementById('discordToken').value,
       slackBotToken: document.getElementById('slackBotToken').value,

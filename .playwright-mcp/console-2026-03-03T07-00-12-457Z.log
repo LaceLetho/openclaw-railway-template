@@ -1,0 +1,8 @@
+[     929ms] [WARNING] [setup] authGroups load failed: TypeError: Cannot set properties of null (setting 'innerHTML')
+    at renderAuth (https://cheerful-expression-production.up.railway.app/setup/app.js:40:27)
+    at https://cheerful-expression-production.up.railway.app/setup/app.js:142:9 @ https://cheerful-expression-production.up.railway.app/setup/app.js:146
+[     931ms] TypeError: Cannot set properties of null (setting 'innerHTML')
+    at renderAuth (https://cheerful-expression-production.up.railway.app/setup/app.js:40:27)
+    at https://cheerful-expression-production.up.railway.app/setup/app.js:148:7
+[   23012ms] TypeError: Cannot read properties of null (reading 'value')
+    at document.getElementById.onclick (https://cheerful-expression-production.up.railway.app/setup/app.js:154:44)

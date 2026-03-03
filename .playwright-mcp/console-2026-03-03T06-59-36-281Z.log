@@ -1,0 +1,7 @@
+[     716ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ chrome-error://chromewebdata/:0
+[   12545ms] [WARNING] [setup] authGroups load failed: TypeError: Cannot set properties of null (setting 'innerHTML')
+    at renderAuth (https://cheerful-expression-production.up.railway.app/setup/app.js:40:27)
+    at https://cheerful-expression-production.up.railway.app/setup/app.js:142:9 @ https://cheerful-expression-production.up.railway.app/setup/app.js:146
+[   12547ms] TypeError: Cannot set properties of null (setting 'innerHTML')
+    at renderAuth (https://cheerful-expression-production.up.railway.app/setup/app.js:40:27)
+    at https://cheerful-expression-production.up.railway.app/setup/app.js:148:7
