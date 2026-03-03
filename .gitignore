@@ -13,3 +13,7 @@ npm-debug.log*
 
 # OS
 .DS_Store
+
+CLAUDE.md
+.claude/
+openclaw-railway-template.code-workspace
