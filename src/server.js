@@ -662,7 +662,9 @@ function buildOnboardArgs(payload) {
       throw new Error(`Missing auth secret for authChoice=${payload.authChoice}`);
     }
 
-    if (flag) {
+    // Only pass API key flag if user actually provided a secret.
+    // If secret is empty, let OpenClaw read from environment variables.
+    if (flag && secret) {
       args.push(flag, secret);
     }
 
