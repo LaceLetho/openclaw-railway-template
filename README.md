@@ -14,7 +14,7 @@ This repo packages **OpenClaw** for Railway with a small **/setup** web wizard s
 
 - The container runs a wrapper web server.
 - The wrapper protects `/setup` (and the Control UI at `/openclaw`) with `SETUP_PASSWORD` using HTTP Basic auth.
-- During setup, the wrapper runs `openclaw onboard --non-interactive ...` inside the container, writes state to the volume, and then starts the gateway.
+- The wrapper is a **pure reverse proxy** - it does NOT run or configure OpenClaw. All OpenClaw initialization is done manually via SSH.
 - After setup, **`/` is OpenClaw**. The wrapper reverse-proxies all traffic (including WebSockets) to the local gateway process.
 
 ## Railway deploy instructions (what you’ll publish as a Template)
@@ -109,20 +109,107 @@ Notes:
 Then:
 - Visit `https://<your-app>.up.railway.app/setup`
   - Your browser will prompt for **HTTP Basic auth**. Use any username; the password is `SETUP_PASSWORD`.
-- Complete setup
+- SSH into your service and run OpenClaw initialization commands (see below)
 - Visit `https://<your-app>.up.railway.app/` and `/openclaw` (same Basic auth)
 
-### Authorizing the Control UI
+## OpenClaw Initialization Commands
 
-After setup, you need to authorize the Control UI to connect to the gateway:
+This template is a **pure reverse proxy** - it does not run or configure OpenClaw. After deploying, SSH into your service and run the following commands:
 
-1. Open the Control UI at `https://<your-app>.up.railway.app/openclaw`
-2. Your browser will show "pairing required" - this is expected
-3. Go to `/setup` → Use the **Debug Console** to run:
-   - `openclaw devices list` — shows pending device requests
-   - `openclaw devices approve <requestId>` — approves the request
+### 1. Run onboarding (create initial config)
 
-Alternatively, you can approve pairing requests via Telegram or Discord if you have configured those channels.
+```bash
+# SSH into your Railway service
+railway ssh --project=<project-id> --service=<service-id>
+
+# Run onboarding with skip auth (API key from env vars)
+openclaw onboard --non-interactive --auth-choice skip --accept-risk
+
+# Or run full interactive onboarding
+openclaw onboard --accept-risk
+```
+
+**onboard options explained:**
+| Option | Description |
+|--------|-------------|
+| `--non-interactive` | Run without waiting for user input |
+| `--accept-risk` | Accept the risk warning |
+| `--auth-choice skip` | Skip auth config (use Railway env vars for API key) |
+| `--flow quickstart` | Use quickstart flow (default) |
+| `--workspace /data/workspace` | Workspace directory |
+| `--gateway-bind loopback` | Bind gateway to localhost only (recommended for proxy) |
+| `--gateway-port 18789` | Gateway port (default) |
+| `--gateway-auth token` | Use token authentication |
+| `--gateway-token <token>` | Set a custom gateway token |
+
+### 2. Add channels (optional)
+
+```bash
+# Add Telegram channel
+openclaw channels add --channel telegram --token <bot-token>
+
+# Add Discord channel
+openclaw channels add --channel discord --token <bot-token>
+
+# Add WhatsApp channel
+openclaw channels add --channel whatsapp --auth-dir /data/.openclaw/auth/whatsapp
+
+# List available channels
+openclaw channels --help
+```
+
+### 3. Authorize Control UI (pairing)
+
+After running onboarding, the Control UI requires device approval:
+
+```bash
+# List pending device requests
+openclaw devices list
+
+# Approve a device
+openclaw devices approve <requestId>
+```
+
+### 4. Fix "origin not allowed" error
+
+If you see "origin not allowed" in the Control UI:
+
+```bash
+# Add your Railway domain to allowed origins
+openclaw config set --json gateway.controlUi.allowedOrigins '["http://localhost:*", "http://127.0.0.1:*", "https://*.up.railway.app", "https://*.railway.app", "https://your-app.up.railway.app"]'
+
+# Restart the gateway
+pkill -f openclaw-gateway
+```
+
+### 5. Other useful commands
+
+```bash
+# Check gateway status
+openclaw status
+
+# Check gateway health
+openclaw health
+
+# Run diagnostics
+openclaw doctor
+
+# Restart gateway
+openclaw gateway restart
+
+# View gateway logs
+tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
+```
+
+### Debug Console in /setup
+
+The `/setup` page includes a **Debug Console** that can run these commands from the browser:
+- `gateway.restart` - Restart the gateway
+- `gateway.stop` - Stop the gateway
+- `gateway.start` - Start the gateway
+- `openclaw.status` - Show status
+- `openclaw.health` - Show health check
+- `openclaw.doctor` - Run diagnostics
 
 ## Support / community
 
@@ -139,14 +226,21 @@ If you’re filing a bug, please include the output of:
 1) Open Telegram and message **@BotFather**
 2) Run `/newbot` and follow the prompts
 3) BotFather will give you a token that looks like: `123456789:AA...`
-4) Paste that token into `/setup`
+4) Add the channel via SSH:
+   ```bash
+   openclaw channels add --channel telegram --token 123456789:AA...
+   ```
 
 ### Discord bot token
 1) Go to the Discord Developer Portal: https://discord.com/developers/applications
 2) **New Application** → pick a name
 3) Open the **Bot** tab → **Add Bot**
-4) Copy the **Bot Token** and paste it into `/setup`
+4) Copy the **Bot Token**
 5) Invite the bot to your server (OAuth2 URL Generator → scopes: `bot`, `applications.commands`; then choose permissions)
+6) Add the channel via SSH:
+   ```bash
+   openclaw channels add --channel discord --token <bot-token>
+   ```
 
 ## Persistence (Railway volume)
 
@@ -210,15 +304,14 @@ Then access the Control UI again to trigger gateway restart.
 
 This is not a crash — it means the gateway is running, but no device has been approved yet.
 
-Fix:
-- Open `/setup`
-- Use the **Debug Console**:
-  - `openclaw devices list`
-  - `openclaw devices approve <requestId>`
+Fix (via SSH):
+```bash
+openclaw devices list
+openclaw devices approve <requestId>
+```
 
 If `openclaw devices list` shows no pending request IDs:
 - Make sure you’re visiting the Control UI at `/openclaw` (or your native app) and letting it attempt to connect
-  - Note: the Railway wrapper now proxies the gateway and injects the auth token automatically, so you should not need to paste the gateway token into the Control UI when using `/openclaw`.
 - Ensure your state dir is the Railway volume (recommended): `OPENCLAW_STATE_DIR=/data/.openclaw`
 - Check `/setup/api/debug` for the active state/workspace dirs + gateway readiness
 

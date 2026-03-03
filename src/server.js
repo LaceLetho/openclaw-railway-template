@@ -458,57 +458,6 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
 </html>`);
 });
 
-const AUTH_GROUPS = [
-  { value: "skip", label: "Skip auth (use env vars)", hint: "Don't configure auth - set MINIMAX_API_KEY etc. in Railway vars", options: [
-    { value: "skip", label: "Skip auth (read from environment variables)" }
-  ]},
-  { value: "openai", label: "OpenAI", hint: "Codex OAuth + API key", options: [
-    { value: "codex-cli", label: "OpenAI Codex OAuth (Codex CLI)" },
-    { value: "openai-codex", label: "OpenAI Codex (ChatGPT OAuth)" },
-    { value: "openai-api-key", label: "OpenAI API key" }
-  ]},
-  { value: "anthropic", label: "Anthropic", hint: "Claude Code CLI + API key", options: [
-    { value: "claude-cli", label: "Anthropic token (Claude Code CLI)" },
-    { value: "token", label: "Anthropic token (paste setup-token)" },
-    { value: "apiKey", label: "Anthropic API key" }
-  ]},
-  { value: "google", label: "Google", hint: "Gemini API key + OAuth", options: [
-    { value: "gemini-api-key", label: "Google Gemini API key" },
-    { value: "google-antigravity", label: "Google Antigravity OAuth" },
-    { value: "google-gemini-cli", label: "Google Gemini CLI OAuth" }
-  ]},
-  { value: "openrouter", label: "OpenRouter", hint: "API key", options: [
-    { value: "openrouter-api-key", label: "OpenRouter API key" }
-  ]},
-  { value: "ai-gateway", label: "Vercel AI Gateway", hint: "API key", options: [
-    { value: "ai-gateway-api-key", label: "Vercel AI Gateway API key" }
-  ]},
-  { value: "moonshot", label: "Moonshot AI", hint: "Kimi K2 + Kimi Code", options: [
-    { value: "moonshot-api-key", label: "Moonshot AI API key" },
-    { value: "kimi-code-api-key", label: "Kimi Code API key" }
-  ]},
-  { value: "zai", label: "Z.AI (GLM 4.7)", hint: "API key", options: [
-    { value: "zai-api-key", label: "Z.AI (GLM 4.7) API key" }
-  ]},
-  { value: "minimax", label: "MiniMax", hint: "M2.1 (recommended)", options: [
-    { value: "minimax-api", label: "MiniMax M2.1" },
-    { value: "minimax-api-lightning", label: "MiniMax M2.1 Lightning" }
-  ]},
-  { value: "qwen", label: "Qwen", hint: "OAuth", options: [
-    { value: "qwen-portal", label: "Qwen OAuth" }
-  ]},
-  { value: "copilot", label: "Copilot", hint: "GitHub + local proxy", options: [
-    { value: "github-copilot", label: "GitHub Copilot (GitHub device login)" },
-    { value: "copilot-proxy", label: "Copilot Proxy (local)" }
-  ]},
-  { value: "synthetic", label: "Synthetic", hint: "Anthropic-compatible (multi-model)", options: [
-    { value: "synthetic-api-key", label: "Synthetic API key" }
-  ]},
-  { value: "opencode-zen", label: "OpenCode Zen", hint: "API key", options: [
-    { value: "opencode-zen", label: "OpenCode Zen (multi-model proxy)" }
-  ]}
-];
-
 app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
   const version = await runCmd(OPENCLAW_NODE, clawArgs(["--version"]));
   const channelsHelp = await runCmd(OPENCLAW_NODE, clawArgs(["channels", "add", "--help"]));
@@ -518,12 +467,7 @@ app.get("/setup/api/status", requireSetupAuth, async (_req, res) => {
     gatewayTarget: GATEWAY_TARGET,
     openclawVersion: version.output.trim(),
     channelsAddHelp: channelsHelp.output,
-    authGroups: AUTH_GROUPS,
   });
-});
-
-app.get("/setup/api/auth-groups", requireSetupAuth, (_req, res) => {
-  res.json({ ok: true, authGroups: AUTH_GROUPS });
 });
 
 function buildOnboardArgs(payload) {
@@ -1412,55 +1356,6 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
       console.log("[wrapper] gateway tokens synced");
     } catch (err) {
       console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
-    }
-
-    // Helper function to get Railway public domain from various environment variables
-    // Railway may not always set RAILWAY_PUBLIC_DOMAIN, so we try multiple sources
-    function getRailwayDomain() {
-      // Try standard Railway variables first
-      if (process.env.RAILWAY_PUBLIC_DOMAIN) return process.env.RAILWAY_PUBLIC_DOMAIN;
-      if (process.env.RAILWAY_STATIC_URL) return process.env.RAILWAY_STATIC_URL;
-
-      // Try service-specific URL variables (e.g., RAILWAY_SERVICE_OPENCLAW_RAILWAY_TEMPLATE_URL)
-      for (const key of Object.keys(process.env)) {
-        if (key.startsWith("RAILWAY_SERVICE_") && key.endsWith("_URL")) {
-          const url = process.env[key];
-          if (url && (url.includes(".up.railway.app") || url.includes(".railway.app"))) {
-            return url;
-          }
-        }
-      }
-      return null;
-    }
-
-    // Fix controlUi.allowedOrigins on every startup (not just after onboard)
-    // This ensures Railway domains are allowed even for existing deployments
-    // Note: OpenClaw does exact origin matching, not wildcard matching, so we must add the exact domain
-    try {
-      const railwayDomain = getRailwayDomain();
-      const allowedOrigins = [
-        "http://localhost:*",
-        "http://127.0.0.1:*",
-        "https://*.up.railway.app",
-        "https://*.railway.app",
-      ];
-      // Add exact Railway domain if available (required because wildcard doesn't work)
-      if (railwayDomain) {
-        // Strip protocol if present
-        const domain = railwayDomain.replace(/^https?:\/\//, "");
-        allowedOrigins.push(`https://${domain}`);
-      } else {
-        // Debug: log available Railway-related env vars if no domain found
-        const railwayVars = Object.keys(process.env).filter(k => k.startsWith("RAILWAY"));
-        console.log(`[wrapper] No Railway domain found. Available RAILWAY vars: ${railwayVars.join(", ")}`);
-      }
-      await runCmd(
-        OPENCLAW_NODE,
-        clawArgs(["config", "set", "--json", "gateway.controlUi.allowedOrigins", JSON.stringify(allowedOrigins)]),
-      );
-      console.log("[wrapper] allowedOrigins synced");
-    } catch (err) {
-      console.warn(`[wrapper] failed to sync allowedOrigins: ${String(err)}`);
     }
   }
 
