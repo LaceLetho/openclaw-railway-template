@@ -111,9 +111,8 @@ openclaw gateway restart
 tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
 railway logs
 
-# Add channels
-openclaw channels add --channel telegram --token <token>
-openclaw channels add --channel discord --token <token>
+# backup
+curl -u <SETUP_PASSWORD> https://<your-railway-domain>/setup/export -o ~/Downloads/backup.tar.gz
 ```
 
 ---
