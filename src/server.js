@@ -450,10 +450,10 @@ app.get("/setup", requireSetupAuth, (_req, res) => {
       <button id="configReload" style="background:#1f2937">Reload</button>
       <button id="configSave" style="background:#111; margin-left:0.5rem">Save</button>
     </div>
-    <pre id=”configOut” style=”white-space:pre-wrap”></pre>
+    <pre id="configOut" style="white-space:pre-wrap"></pre>
   </div>
 
-  <script src=”/setup/app.js”></script>
+  <script src="/setup/app.js"></script>
 </body>
 </html>`);
 });
