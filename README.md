@@ -39,6 +39,18 @@ In Railway **Variables** tab:
 | `SETUP_PASSWORD` | Random password | HTTP Basic auth password |
 | `OPENCLAW_GATEWAY_TOKEN` | Random token | Gateway auth token |
 
+#### Optional: Remote Control (for opencode-mcp)
+
+| Variable | Value | Description |
+|----------|-------|-------------|
+| `OPENCODE_BASE_URL` | Your Railway domain | OpenCode MCP server URL |
+| `OPENCODE_SERVER_USERNAME` | Username | HTTP Basic auth username |
+| `OPENCODE_SERVER_PASSWORD` | Password | HTTP Basic auth password |
+| `OPENCODE_DEFAULT_PROVIDER` | Provider name | Default LLM provider |
+| `OPENCODE_DEFAULT_MODEL` | Model name | Default model |
+
+Set these to enable remote control of OpenClaw via opencode-mcp.
+
 ### 3. Configure Storage & Networking
 
 1. Add a **Volume** to your service, mount at `/data`
