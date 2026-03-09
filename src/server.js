@@ -370,8 +370,13 @@ proxy.on("proxyReqWs", (_proxyReq, req) => {
 // Route Feishu/Lark webhook events to the feishu channel's standalone HTTP server.
 // The feishu plugin (webhook mode) creates its own server on FEISHU_WEBHOOK_PORT,
 // separate from the main gateway. No gateway auth header needed here.
-app.use("/feishu", (req, res) => {
-  return proxy.web(req, res, { target: FEISHU_WEBHOOK_TARGET });
+// NOTE: must NOT use app.use("/feishu", ...) — Express strips the matched prefix
+// from req.url, so the proxy would forward /events instead of /feishu/events.
+app.use((req, res, next) => {
+  if (req.path === "/feishu" || req.path.startsWith("/feishu/")) {
+    return proxy.web(req, res, { target: FEISHU_WEBHOOK_TARGET });
+  }
+  return next();
 });
 
 app.use(requireAuth, async (req, res) => {
