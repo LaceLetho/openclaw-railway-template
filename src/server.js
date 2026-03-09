@@ -367,14 +367,37 @@ proxy.on("proxyReqWs", (_proxyReq, req) => {
   attachGatewayAuthHeader(req);
 });
 
+// Separate proxy for the Feishu/Lark webhook server (runs on FEISHU_WEBHOOK_PORT).
+// A dedicated proxy instance is needed so we can intercept the response and fix
+// Content-Type: the Lark SDK returns text/plain for challenge responses, but Lark
+// platform requires application/json or it rejects with "not valid JSON format".
+const feishuProxy = httpProxy.createProxyServer({ target: FEISHU_WEBHOOK_TARGET });
+
+feishuProxy.on("error", (err, _req, res) => {
+  console.error("[feishu-proxy]", err);
+  try {
+    if (res && typeof res.writeHead === "function" && !res.headersSent) {
+      res.writeHead(502, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "Feishu webhook server unavailable" }));
+    }
+  } catch {
+    // ignore
+  }
+});
+
+feishuProxy.on("proxyRes", (proxyRes) => {
+  // Lark platform requires Content-Type: application/json on all webhook responses.
+  if (proxyRes.headers["content-type"]?.startsWith("text/plain")) {
+    proxyRes.headers["content-type"] = "application/json; charset=utf-8";
+  }
+});
+
 // Route Feishu/Lark webhook events to the feishu channel's standalone HTTP server.
-// The feishu plugin (webhook mode) creates its own server on FEISHU_WEBHOOK_PORT,
-// separate from the main gateway. No gateway auth header needed here.
 // NOTE: must NOT use app.use("/feishu", ...) — Express strips the matched prefix
 // from req.url, so the proxy would forward /events instead of /feishu/events.
 app.use((req, res, next) => {
   if (req.path === "/feishu" || req.path.startsWith("/feishu/")) {
-    return proxy.web(req, res, { target: FEISHU_WEBHOOK_TARGET });
+    return feishuProxy.web(req, res);
   }
   return next();
 });
