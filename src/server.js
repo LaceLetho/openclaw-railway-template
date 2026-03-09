@@ -265,9 +265,15 @@ function runCmd(cmd, args, opts = {}) {
 // requests are rejected with a 401 to prevent open access.
 const DASHBOARD_PASSWORD = process.env.PASSWORD?.trim();
 
+// Paths that bypass HTTP Basic Auth (third-party webhooks with their own auth mechanisms).
+const PUBLIC_PATHS = [
+  "/healthz",
+  "/feishu/events", // Lark/Feishu webhook — verified by gateway via X-Lark-Signature
+];
+
 function requireAuth(req, res, next) {
-  // Railway health probe — always allow.
-  if (req.path === "/healthz") return next();
+  // Railway health probe and third-party webhooks — always allow.
+  if (PUBLIC_PATHS.some((p) => req.path === p || req.path.startsWith(p + "/"))) return next();
 
   if (!DASHBOARD_PASSWORD) {
     return res.status(503).type("text/plain").send(
