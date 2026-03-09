@@ -1,24 +1,22 @@
-# OpenClaw Railway Template (1‑click deploy)
+# OpenClaw Railway Template
 
-This repo packages **OpenClaw** for Railway with a reverse proxy
+This repo packages **OpenClaw** for Railway with a minimal reverse proxy wrapper.
 
 ## What you get
 
 - **OpenClaw Gateway + Control UI** (served at `/` and `/openclaw`)
-- Persistent state via **Railway Volume** (so config/credentials/memory survive redeploys)
-- One-click **Export backup** (so users can migrate off Railway later)
-- **Import backup** from `/setup` (advanced recovery)
+- Persistent state via **Railway Volume** (config/credentials/memory survive redeploys)
+- HTTP Basic Auth protecting the entire service (`PASSWORD` env var)
+- Health check endpoint at `/healthz`
 
-## How it works (high level)
+## How it works
 
-- The container runs a wrapper web server.
-- The wrapper protects `/setup` (and the Control UI at `/openclaw`) with `SETUP_PASSWORD` using HTTP Basic auth.
-- The wrapper is a **pure reverse proxy** - it does NOT run or configure OpenClaw. All OpenClaw initialization is done manually via SSH.
-- After setup, **`/` is OpenClaw**. The wrapper reverse-proxies all traffic (including WebSockets) to the local gateway process.
+- The container runs a small Express wrapper server.
+- The wrapper protects all routes (except `/healthz`) with HTTP Basic Auth using the `PASSWORD` env var.
+- **OpenClaw is initialized manually via SSH** — run `openclaw onboard` once after first deploy.
+- After initialization, the wrapper auto-starts the OpenClaw gateway on every boot and reverse-proxies all traffic (including WebSockets) to it.
 
-## Quick Deploy Guide
-
-This is a verified step-by-step workflow to deploy OpenClaw on Railway.
+## Deploy Guide
 
 ### 1. Create Railway Project
 
@@ -27,29 +25,17 @@ This is a verified step-by-step workflow to deploy OpenClaw on Railway.
 
 ### 2. Set Environment Variables
 
-In Railway **Variables** tab:
+In the Railway **Variables** tab:
 
 | Variable | Value | Description |
 |----------|-------|-------------|
+| `PASSWORD` | A strong password | HTTP Basic Auth — protects the entire service |
+| `OPENCLAW_GATEWAY_TOKEN` | A random token | Gateway auth token (keep secret, stays stable) |
+| `OPENCLAW_STATE_DIR` | `/data/.openclaw` | State directory (set by default in railway.toml) |
+| `OPENCLAW_WORKSPACE_DIR` | `/data/workspace` | Workspace directory (set by default in railway.toml) |
 | `MINIMAX_API_KEY` | Your MiniMax API Key | LLM provider |
-| `BRAVE_API_KEY` | Your Brave Search API Key | Required for web search |
-| `OPENCLAW_GIT_REF` | `v2026.3.2` | OpenClaw version |
-| `OPENCLAW_STATE_DIR` | `/data/.openclaw` | State directory |
-| `OPENCLAW_WORKSPACE_DIR` | `/data/workspace` | Workspace directory |
-| `SETUP_PASSWORD` | Random password | HTTP Basic auth password |
-| `OPENCLAW_GATEWAY_TOKEN` | Random token | Gateway auth token |
-
-#### Optional: Remote Control (for opencode-mcp)
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `OPENCODE_BASE_URL` | Your Railway domain | OpenCode MCP server URL |
-| `OPENCODE_SERVER_USERNAME` | Username | HTTP Basic auth username |
-| `OPENCODE_SERVER_PASSWORD` | Password | HTTP Basic auth password |
-| `OPENCODE_DEFAULT_PROVIDER` | Provider name | Default LLM provider |
-| `OPENCODE_DEFAULT_MODEL` | Model name | Default model |
-
-Set these to enable remote control of OpenClaw via opencode-mcp.
+| `BRAVE_API_KEY` | Your Brave Search API Key | Web search |
+| `OPENCLAW_GIT_REF` | `v2026.3.2` | OpenClaw version to build |
 
 ### 3. Configure Storage & Networking
 
@@ -59,7 +45,9 @@ Set these to enable remote control of OpenClaw via opencode-mcp.
 
 ### 4. Deploy
 
-Connect to this GitHub repo and Railway will deploy automatically.
+Connect this GitHub repo — Railway will build and deploy automatically.
+
+The service will start but return 503 until OpenClaw is initialized (next step).
 
 ### 5. SSH and Install Homebrew
 
@@ -68,35 +56,30 @@ railway ssh --project=<project-id> --service=<service-id>
 
 # Install Homebrew
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
 
-### 6. Initialize OpenClaw
+# Run onboarding (one-time setup)
+openclaw onboard \
+  --workspace /data/workspace \
+  --gateway-bind loopback \
+  --gateway-port 18789 \
+  --gateway-auth token \
+  --gateway-token "$OPENCLAW_GATEWAY_TOKEN" \
+  --no-install-daemon
 
-```bash
-openclaw onboard --workspace /data/workspace --gateway-bind loopback --gateway-port 18789 --no-install-daemon
-```
-
-### 7. Configure OpenClaw
-
-```bash
-# Allow your Railway domain
-openclaw config set --json gateway.controlUi.allowedOrigins ‘["https://<your-domain>.railway.app"]’
+# Allow your Railway domain in the Control UI
+openclaw config set --json gateway.controlUi.allowedOrigins '["https://<your-domain>.up.railway.app"]'
 
 # Enable full tools
 openclaw config set --json tools.profile ‘"full"’
 ```
 
-### 8. Start Gateway
+### 6. Restart the Service
 
-```bash
-openclaw gateway start
-# Or run in background:
-nohup openclaw gateway start > /tmp/openclaw-gateway.log 2>&1 &
-```
+After onboarding, redeploy or restart the Railway service. The wrapper will detect the config and start the gateway automatically.
 
-### 9. Approve Device Pairing
+### 7. Approve Device Pairing
 
-After visiting Control UI, approve the device:
+After visiting the Control UI for the first time, approve device pairing via SSH:
 
 ```bash
 openclaw devices list
@@ -116,35 +99,34 @@ openclaw status
 openclaw health
 openclaw doctor
 
-# Restart gateway
-openclaw gateway restart
-
-# View logs
-tail -f /tmp/openclaw/openclaw-$(date +%Y-%m-%d).log
+# View gateway logs
 railway logs
 
-# backup
-curl -u <SETUP_PASSWORD> https://<your-railway-domain>/setup/export -o ~/Downloads/backup.tar.gz
+# Restart gateway (takes effect after Railway redeploy)
+openclaw gateway restart
 ```
 
 ---
 
 ## Troubleshooting
 
-### "origin not allowed"
-```bash
-openclaw config set --json gateway.controlUi.allowedOrigins ‘["https://your-app.up.railway.app"]’
-pkill -f openclaw-gateway
-```
+### Service returns 503 on startup
+OpenClaw has not been initialized yet. SSH in and run `openclaw onboard` (Step 5 above).
 
-### "pairing required"
+### "origin not allowed" in Control UI
+```bash
+openclaw config set --json gateway.controlUi.allowedOrigins '["https://your-app.up.railway.app"]'
+```
+Then restart the service.
+
+### "pairing required" / disconnected
 ```bash
 openclaw devices list
 openclaw devices approve <requestId>
 ```
 
 ### 502 Bad Gateway
-- Check Volume is mounted at `/data`
-- Check `OPENCLAW_STATE_DIR` and `OPENCLAW_WORKSPACE_DIR` are set
-- Check Railway logs for errors
-
+- Confirm the Volume is mounted at `/data`
+- Confirm `OPENCLAW_STATE_DIR` and `OPENCLAW_WORKSPACE_DIR` are set
+- Check Railway logs: `railway logs`
+- Visit `/healthz` to see if the gateway process is reachable

@@ -260,113 +260,34 @@ function runCmd(cmd, args, opts = {}) {
   });
 }
 
-// Auto-onboard on first boot (no setup page required).
-async function autoOnboard() {
-  console.log("[wrapper] not configured; running auto-onboard...");
+// Protect the dashboard with a password (HTTP Basic Auth).
+// Set PASSWORD in Railway Variables. Without it the service starts but all non-healthz
+// requests are rejected with a 401 to prevent open access.
+const DASHBOARD_PASSWORD = process.env.PASSWORD?.trim();
 
-  fs.mkdirSync(STATE_DIR, { recursive: true });
-  fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+function requireAuth(req, res, next) {
+  // Railway health probe — always allow.
+  if (req.path === "/healthz") return next();
 
-  const onboardArgs = [
-    "onboard",
-    "--non-interactive",
-    "--accept-risk",
-    "--json",
-    "--no-install-daemon",
-    "--skip-health",
-    "--workspace",
-    WORKSPACE_DIR,
-    "--gateway-bind",
-    "loopback",
-    "--gateway-port",
-    String(INTERNAL_GATEWAY_PORT),
-    "--gateway-auth",
-    "token",
-    "--gateway-token",
-    OPENCLAW_GATEWAY_TOKEN,
-    "--flow",
-    "quickstart",
-    "--auth-choice",
-    "skip",
-  ];
-
-  const onboard = await runCmd(OPENCLAW_NODE, clawArgs(onboardArgs));
-  console.log(`[wrapper] onboard exit=${onboard.code}`);
-  if (onboard.output) console.log(onboard.output);
-
-  if (onboard.code !== 0 || !isConfigured()) {
-    console.error("[wrapper] auto-onboard failed; gateway will not start until config exists.");
-    return;
+  if (!DASHBOARD_PASSWORD) {
+    return res.status(503).type("text/plain").send(
+      "PASSWORD env var is not set. Set it in Railway Variables to enable access.\n",
+    );
   }
 
-  // Configure gateway auth and network settings.
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.bind", "loopback"]));
-  await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.port", String(INTERNAL_GATEWAY_PORT)]));
-
-  // Trust loopback as a proxy hop so X-Forwarded-* headers are handled correctly on Railway.
-  await runCmd(
-    OPENCLAW_NODE,
-    clawArgs(["config", "set", "--json", "gateway.trustedProxies", JSON.stringify(["127.0.0.1"])]),
-  );
-
-  // Set controlUi.allowedOrigins for Railway domains.
-  const allowedOrigins = [
-    "http://localhost:*",
-    "http://127.0.0.1:*",
-    "https://*.up.railway.app",
-    "https://*.railway.app",
-  ];
-  // Add exact Railway domain if available (wildcard may not match for some OpenClaw builds).
-  const railwayDomain =
-    process.env.RAILWAY_PUBLIC_DOMAIN ||
-    process.env.RAILWAY_STATIC_URL ||
-    (() => {
-      for (const key of Object.keys(process.env)) {
-        if (key.startsWith("RAILWAY_SERVICE_") && key.endsWith("_URL")) {
-          const url = process.env[key];
-          if (url && (url.includes(".up.railway.app") || url.includes(".railway.app"))) return url;
-        }
-      }
-      return null;
-    })();
-  if (railwayDomain) {
-    allowedOrigins.push(`https://${railwayDomain.replace(/^https?:\/\//, "")}`);
+  const header = req.headers.authorization || "";
+  const [scheme, encoded] = header.split(" ");
+  if (scheme !== "Basic" || !encoded) {
+    res.set("WWW-Authenticate", 'Basic realm="OpenClaw"');
+    return res.status(401).send("Authentication required\n");
   }
-  await runCmd(
-    OPENCLAW_NODE,
-    clawArgs(["config", "set", "--json", "gateway.controlUi.allowedOrigins", JSON.stringify(allowedOrigins)]),
-  );
-
-  // Workaround for openclaw bug #15275: fix MiniMax baseUrl (.io → .com).
-  for (const filePath of [
-    path.join(STATE_DIR, "agents", "main", "agent", "models.json"),
-    path.join(STATE_DIR, "openclaw.json"),
-  ]) {
-    try {
-      const raw = fs.readFileSync(filePath, "utf8");
-      const obj = JSON.parse(raw);
-      let changed = false;
-      const fixMinimax = (providers) => {
-        if (providers?.minimax?.baseUrl === "https://api.minimax.io/anthropic") {
-          providers.minimax.baseUrl = "https://api.minimaxi.com/anthropic";
-          changed = true;
-        }
-      };
-      fixMinimax(obj.providers);
-      fixMinimax(obj.models?.providers);
-      if (changed) {
-        fs.writeFileSync(filePath, JSON.stringify(obj, null, 2) + "\n", "utf8");
-        console.log(`[wrapper] minimax baseUrl fix applied to ${path.basename(filePath)}`);
-      }
-    } catch {
-      // file may not exist yet — ignore
-    }
+  const decoded = Buffer.from(encoded, "base64").toString("utf8");
+  const password = decoded.slice(decoded.indexOf(":") + 1);
+  if (password !== DASHBOARD_PASSWORD) {
+    res.set("WWW-Authenticate", 'Basic realm="OpenClaw"');
+    return res.status(401).send("Invalid password\n");
   }
-
-  console.log("[wrapper] auto-onboard complete");
+  return next();
 }
 
 const app = express();
@@ -435,7 +356,7 @@ proxy.on("proxyReqWs", (_proxyReq, req) => {
   attachGatewayAuthHeader(req);
 });
 
-app.use(async (req, res) => {
+app.use(requireAuth, async (req, res) => {
   try {
     await ensureGatewayRunning();
   } catch (err) {
@@ -457,11 +378,6 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
 
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);
   console.log(`[wrapper] gateway target: ${GATEWAY_TARGET}`);
-
-  // Auto-onboard on first deployment.
-  if (!isConfigured()) {
-    await autoOnboard();
-  }
 
   // Sync gateway tokens in config on every startup (handles token rotation).
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
