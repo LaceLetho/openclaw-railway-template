@@ -2,6 +2,8 @@
 
 This repo packages **OpenClaw** for Railway with a minimal reverse proxy wrapper.
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/fxd-c2?referralCode=Se0h8C&utm_medium=integration&utm_source=template&utm_campaign=generic)
+
 ## What you get
 
 - **OpenClaw Gateway + Control UI** (served at `/` and `/openclaw`)
@@ -16,45 +18,15 @@ This repo packages **OpenClaw** for Railway with a minimal reverse proxy wrapper
 - **OpenClaw is initialized manually via SSH** — run `openclaw onboard` once after first deploy.
 - After initialization, the wrapper auto-starts the OpenClaw gateway on every boot and reverse-proxies all traffic (including WebSockets) to it.
 
-## Deploy Guide
+## Onboarding guide
 
-### 1. Create Railway Project
-
-1. Go to Railway and create a new **Empty Project**
-2. Add an **Empty Service** (not from a template)
-
-### 2. Set Environment Variables
-
-In the Railway **Variables** tab:
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `PASSWORD` | A strong password | HTTP Basic Auth — protects the entire service |
-| `OPENCLAW_GATEWAY_TOKEN` | A random token | Gateway auth token (keep secret, stays stable) |
-| `OPENCLAW_STATE_DIR` | `/data/.openclaw` | State directory (set by default in railway.toml) |
-| `OPENCLAW_WORKSPACE_DIR` | `/data/workspace` | Workspace directory (set by default in railway.toml) |
-| `MINIMAX_API_KEY` | Your MiniMax API Key | LLM provider |
-| `BRAVE_API_KEY` | Your Brave Search API Key | Web search |
-| `OPENCLAW_GIT_REF` | `v2026.3.2` | OpenClaw version to build |
-
-### 3. Configure Storage & Networking
-
-1. Add a **Volume** to your service, mount at `/data`
-2. Go to **Settings → Networking**, click **Generate Domain**
-3. Enable **Public Networking** (HTTP)
-
-### 4. Deploy
-
-Connect this GitHub repo — Railway will build and deploy automatically.
-
-The service will start but return 503 until OpenClaw is initialized (next step).
-
-### 5. SSH and Install Homebrew
+### 1. SSH and Install Homebrew
 
 ```bash
-railway ssh --project=<project-id> --service=<service-id>
+# login into the server
+railway ssh --project=<project-id> --service=<service-id> --environment=<environment-id>
 
-# Install Homebrew
+# Install Homebrew (helpful for installing skills) 
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Run onboarding (one-time setup)
@@ -69,15 +41,15 @@ openclaw onboard \
 # Allow your Railway domain in the Control UI
 openclaw config set --json gateway.controlUi.allowedOrigins '["https://<your-domain>.up.railway.app"]'
 
-# Enable full tools
+# Enable full tools (enable all tools for openclaw)
 openclaw config set --json tools.profile ‘"full"’
 ```
 
-### 6. Restart the Service
+### 2. Restart the Service
 
 After onboarding, redeploy or restart the Railway service. The wrapper will detect the config and start the gateway automatically.
 
-### 7. Approve Device Pairing
+### 3. Approve Device Pairing
 
 After visiting the Control UI for the first time, approve device pairing via SSH:
 
