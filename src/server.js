@@ -61,6 +61,11 @@ const INTERNAL_GATEWAY_PORT = Number.parseInt(process.env.INTERNAL_GATEWAY_PORT 
 const INTERNAL_GATEWAY_HOST = process.env.INTERNAL_GATEWAY_HOST ?? "127.0.0.1";
 const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}`;
 
+// Where the Feishu webhook server listens (started by the feishu channel plugin).
+// Must match channels.feishu.webhookPort in openclaw config (default: 3000).
+const FEISHU_WEBHOOK_PORT = Number.parseInt(process.env.FEISHU_WEBHOOK_PORT ?? "3000", 10);
+const FEISHU_WEBHOOK_TARGET = `http://127.0.0.1:${FEISHU_WEBHOOK_PORT}`;
+
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
 
@@ -360,6 +365,13 @@ function attachGatewayAuthHeader(req) {
 
 proxy.on("proxyReqWs", (_proxyReq, req) => {
   attachGatewayAuthHeader(req);
+});
+
+// Route Feishu/Lark webhook events to the feishu channel's standalone HTTP server.
+// The feishu plugin (webhook mode) creates its own server on FEISHU_WEBHOOK_PORT,
+// separate from the main gateway. No gateway auth header needed here.
+app.use("/feishu", (req, res) => {
+  return proxy.web(req, res, { target: FEISHU_WEBHOOK_TARGET });
 });
 
 app.use(requireAuth, async (req, res) => {
