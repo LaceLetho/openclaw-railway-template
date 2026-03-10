@@ -80,6 +80,18 @@ openclaw gateway restart
 
 ---
 
+## Upgrading OpenClaw
+
+To upgrade to a newer version of OpenClaw, update the `OPENCLAW_GIT_REF` environment variable in Railway and redeploy:
+
+1. Go to your Railway service → **Variables**
+2. Set `OPENCLAW_GIT_REF` to the desired version tag (e.g. `v2026.3.8`)
+3. Redeploy the service — Railway will rebuild the Docker image from that git ref
+
+Your persistent state (config, credentials, memory) on the Railway Volume is unaffected by upgrades.
+
+---
+
 ## Troubleshooting
 
 ### Service returns 503 on startup
