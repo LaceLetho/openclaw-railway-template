@@ -90,6 +90,16 @@ To upgrade to a newer version of OpenClaw, update the `OPENCLAW_GIT_REF` environ
 
 Your persistent state (config, credentials, memory) on the Railway Volume is unaffected by upgrades.
 
+### Updating Plugins
+
+For **built-in OpenClaw plugins**, SSH into the service and run:
+
+```bash
+openclaw plugins update --all
+```
+
+For **third-party or custom plugins**, updates need to be handled manually — either follow the plugin's own documentation, or ask OpenClaw to help by referencing the relevant project docs.
+
 ---
 
 ## Troubleshooting
