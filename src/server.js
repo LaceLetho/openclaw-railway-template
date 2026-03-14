@@ -274,6 +274,7 @@ const DASHBOARD_PASSWORD = process.env.PASSWORD?.trim();
 const PUBLIC_PATHS = [
   "/healthz",
   "/feishu/events", // Lark/Feishu webhook — verified by gateway via X-Lark-Signature
+  "/hooks", // OpenClaw hooks — verified by gateway via token
 ];
 
 function requireAuth(req, res, next) {
