@@ -455,7 +455,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   }
 
   if (isConfigured()) {
-    console.log("[wrapper] config detected; starting gateway...");
+    console.log("[wrapper] config detected, starting gateway...");
     try {
       await ensureGatewayRunning();
       console.log("[wrapper] gateway ready");
