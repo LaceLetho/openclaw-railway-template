@@ -51,9 +51,11 @@ openclaw config set --json tools.profile '"full"'
 openclaw config set --json plugins.allow '["telegram","feishu"]'
 ```
 
-### 2. Restart the Service
+### 2. Restart / Redeploy the Railway service
 
 After onboarding, redeploy or restart the Railway service. The wrapper will detect the config and start the gateway automatically.
+
+> In Railway / Docker, prefer restarting the **service/deployment** itself. `openclaw gateway restart` is aimed at daemon-style installs and can be misleading in container environments.
 
 ### 3. Approve Device Pairing
 
@@ -125,12 +127,37 @@ openclaw devices list
 openclaw devices approve <requestId>
 ```
 
+### Proxy warnings like `Proxy headers detected from untrusted address`
+```bash
+openclaw config set --json gateway.trustedProxies '["127.0.0.1","::1","::ffff:127.0.0.1"]'
+```
+This template runs a local reverse proxy in front of the gateway, so these loopback proxy addresses should be trusted.
+
+### Non-bundled plugin warnings (`plugins.allow is empty`)
+If you install third-party plugins, pin an explicit allowlist:
+```bash
+openclaw config set --json plugins.allow '["telegram","feishu","<your-plugin-id>"]'
+```
+
+### Telegram group allowlist gotcha
+`channels.telegram.allowFrom` / `groupAllowFrom` expect **Telegram user IDs**, not group chat IDs. To allow a group or supergroup, configure it under `channels.telegram.groups` and set the per-group policy there.
+
+### Hook sessions keep multiplying
+If you use hooks heavily, consider pinning a default session key:
+```bash
+openclaw config set hooks.defaultSessionKey hook:ingress
+```
+
 ### 502 Bad Gateway
 - Confirm the Volume is mounted at `/data`
 - Confirm `OPENCLAW_STATE_DIR` and `OPENCLAW_WORKSPACE_DIR` are set
 - Check Railway logs: `railway logs`
 - Visit `/healthz` to see if the gateway process is reachable
-m the Volume is mounted at `/data`
+ress
+```
+
+### 502 Bad Gateway
+- Confirm the Volume is mounted at `/data`
 - Confirm `OPENCLAW_STATE_DIR` and `OPENCLAW_WORKSPACE_DIR` are set
 - Check Railway logs: `railway logs`
 - Visit `/healthz` to see if the gateway process is reachable
