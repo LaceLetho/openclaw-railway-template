@@ -20,13 +20,13 @@ This repo packages **OpenClaw** for Railway with a minimal reverse proxy wrapper
 
 ## Onboarding guide
 
-### 1. SSH and Install Homebrew
+### 1. SSH into the service
 
 ```bash
 # login into the server
 railway ssh --project=<project-id> --service=<service-id> --environment=<environment-id>
 
-# Install Homebrew (helpful for installing skills) 
+# Optional: install Homebrew if you want an easier path for extra CLI tools / skills
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Run onboarding (one-time setup)
@@ -41,8 +41,14 @@ openclaw onboard \
 # Allow your Railway domain in the Control UI
 openclaw config set --json gateway.controlUi.allowedOrigins '["https://<your-domain>.up.railway.app"]'
 
-# Enable full tools (enable all tools for openclaw)
-openclaw config set --json tools.profile ‘"full"’
+# Trust the local reverse proxy used by this template
+openclaw config set --json gateway.trustedProxies '["127.0.0.1","::1","::ffff:127.0.0.1"]'
+
+# Enable full tools
+openclaw config set --json tools.profile '"full"'
+
+# If you install non-bundled plugins, pin an explicit allowlist
+openclaw config set --json plugins.allow '["telegram","feishu"]'
 ```
 
 ### 2. Restart / Redeploy the Railway service
@@ -76,8 +82,8 @@ openclaw doctor
 # View gateway logs
 railway logs
 
-# Restart gateway (takes effect after Railway redeploy)
-openclaw gateway restart
+# Restart the Railway service / redeploy from the Railway UI or CLI
+railway redeploy
 ```
 
 ---
@@ -155,4 +161,3 @@ ress
 - Confirm `OPENCLAW_STATE_DIR` and `OPENCLAW_WORKSPACE_DIR` are set
 - Check Railway logs: `railway logs`
 - Visit `/healthz` to see if the gateway process is reachable
- the gateway process is reachable
