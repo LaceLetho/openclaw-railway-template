@@ -421,6 +421,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   console.log(`[wrapper] workspace dir: ${WORKSPACE_DIR}`);
 
   try { fs.mkdirSync(path.join(STATE_DIR, "credentials"), { recursive: true }); } catch {}
+  try { fs.chmodSync(path.join(STATE_DIR, "credentials"), 0o700); } catch {}
   try { fs.chmodSync(STATE_DIR, 0o700); } catch {}
 
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);
@@ -428,14 +429,15 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
 
   // Sync gateway tokens in config on every startup (handles token rotation).
   if (isConfigured() && OPENCLAW_GATEWAY_TOKEN) {
-    console.log("[wrapper] syncing gateway tokens in config...");
+    console.log("[wrapper] syncing gateway config...");
     try {
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.mode", "token"]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.auth.token", OPENCLAW_GATEWAY_TOKEN]));
       await runCmd(OPENCLAW_NODE, clawArgs(["config", "set", "gateway.remote.token", OPENCLAW_GATEWAY_TOKEN]));
-      console.log("[wrapper] gateway tokens synced");
+      await setJsonConfig("gateway.trustedProxies", ["127.0.0.1", "::1", "::ffff:127.0.0.1"]);
+      console.log("[wrapper] gateway config synced");
     } catch (err) {
-      console.warn(`[wrapper] failed to sync gateway tokens: ${String(err)}`);
+      console.warn(`[wrapper] failed to sync gateway config: ${String(err)}`);
     }
   }
 
