@@ -68,6 +68,10 @@ const FEISHU_WEBHOOK_TARGET = `http://127.0.0.1:${FEISHU_WEBHOOK_PORT}`;
 
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
+const GATEWAY_START_TIMEOUT_MS = Number.parseInt(
+  process.env.OPENCLAW_GATEWAY_START_TIMEOUT_MS ?? "45000",
+  10,
+);
 
 function clawArgs(args) {
   return [OPENCLAW_ENTRY, ...args];
@@ -77,6 +81,30 @@ function resolveConfigCandidates() {
   const explicit = process.env.OPENCLAW_CONFIG_PATH?.trim();
   if (explicit) return [explicit];
   return [path.join(STATE_DIR, "openclaw.json")];
+}
+
+function resolveWritableConfigPath() {
+  const candidates = resolveConfigCandidates();
+  const existing = candidates.find((candidate) => fs.existsSync(candidate));
+  return existing ?? candidates[0];
+}
+
+function setJsonConfig(keyPath, value) {
+  const configPath = resolveWritableConfigPath();
+  const src = fs.readFileSync(configPath, "utf8");
+  const doc = JSON.parse(src);
+
+  const keys = keyPath.split(".");
+  let cursor = doc;
+  for (const key of keys.slice(0, -1)) {
+    if (!cursor[key] || typeof cursor[key] !== "object" || Array.isArray(cursor[key])) {
+      cursor[key] = {};
+    }
+    cursor = cursor[key];
+  }
+  cursor[keys.at(-1)] = value;
+
+  fs.writeFileSync(configPath, `${JSON.stringify(doc, null, 2)}\n`, "utf8");
 }
 
 function isConfigured() {
@@ -119,7 +147,7 @@ function sleep(ms) {
 }
 
 async function waitForGatewayReady(opts = {}) {
-  const timeoutMs = opts.timeoutMs ?? 20_000;
+  const timeoutMs = opts.timeoutMs ?? GATEWAY_START_TIMEOUT_MS;
   const start = Date.now();
   const authHeader = `Bearer ${OPENCLAW_GATEWAY_TOKEN}`;
   while (Date.now() - start < timeoutMs) {
@@ -197,7 +225,7 @@ async function ensureGatewayRunning() {
       try {
         lastGatewayError = null;
         await startGateway();
-        const ready = await waitForGatewayReady({ timeoutMs: 20_000 });
+        const ready = await waitForGatewayReady({ timeoutMs: GATEWAY_START_TIMEOUT_MS });
         if (!ready) {
           if (gatewayProc) {
             try {
@@ -220,6 +248,33 @@ async function ensureGatewayRunning() {
   }
   await gatewayStarting;
   return { ok: true };
+}
+
+async function probeGateway() {
+  if (!isConfigured()) return false;
+  try {
+    const net = await import("node:net");
+    return await new Promise((resolve) => {
+      const sock = net.createConnection({
+        host: INTERNAL_GATEWAY_HOST,
+        port: INTERNAL_GATEWAY_PORT,
+        timeout: 750,
+      });
+      const done = (ok) => {
+        try {
+          sock.destroy();
+        } catch {
+          // ignore
+        }
+        resolve(ok);
+      };
+      sock.on("connect", () => done(true));
+      sock.on("timeout", () => done(false));
+      sock.on("error", () => done(false));
+    });
+  } catch {
+    return false;
+  }
 }
 
 
@@ -307,25 +362,7 @@ app.disable("x-powered-by");
 
 // Health check (no auth) for Railway probes.
 app.get("/healthz", async (_req, res) => {
-  let gatewayReachable = false;
-  if (isConfigured()) {
-    try {
-      const net = await import("node:net");
-      gatewayReachable = await new Promise((resolve) => {
-        const sock = net.createConnection({
-          host: INTERNAL_GATEWAY_HOST,
-          port: INTERNAL_GATEWAY_PORT,
-          timeout: 750,
-        });
-        const done = (ok) => { try { sock.destroy(); } catch {} resolve(ok); };
-        sock.on("connect", () => done(true));
-        sock.on("timeout", () => done(false));
-        sock.on("error", () => done(false));
-      });
-    } catch {
-      gatewayReachable = false;
-    }
-  }
+  const gatewayReachable = await probeGateway();
 
   res.json({
     ok: true,
