@@ -2,9 +2,13 @@
 
 const http = require("node:http");
 const https = require("node:https");
+const net = require("node:net");
+const tls = require("node:tls");
 
 const TRACE_PREFIX = "[telegram-trace]";
 const TELEGRAM_HOSTS = new Set(["api.telegram.org", "api.telegram.org:443"]);
+
+process.stderr.write(`${TRACE_PREFIX} hook-loaded pid=${process.pid}\n`);
 
 function logTrace(target, sourceLabel) {
   if (!target) {
@@ -190,3 +194,54 @@ try {
 } catch {
   // ignore if undici is unavailable
 }
+
+function extractSocketTarget(args) {
+  const [input, ...rest] = args;
+  if (typeof input === "object" && input) {
+    return {
+      host: input.host || input.hostname || input.servername || "",
+      port: input.port || "",
+    };
+  }
+  if (typeof input === "number") {
+    const maybeHost = typeof rest[0] === "string" ? rest[0] : "";
+    return {
+      host: maybeHost,
+      port: input,
+    };
+  }
+  if (typeof input === "string") {
+    return {
+      host: input,
+      port: typeof rest[0] === "number" ? rest[0] : "",
+    };
+  }
+  return null;
+}
+
+function shouldTraceSocket(target) {
+  if (!target) {
+    return false;
+  }
+  return target.host === "api.telegram.org";
+}
+
+function patchSocketConnect(moduleRef, key, label) {
+  const original = moduleRef[key];
+  if (typeof original !== "function") {
+    return;
+  }
+  moduleRef[key] = function patchedConnect(...args) {
+    const target = extractSocketTarget(args);
+    if (shouldTraceSocket(target)) {
+      process.stderr.write(
+        `${TRACE_PREFIX} source=${label} host=${target.host} port=${target.port || ""}\n`,
+      );
+    }
+    return original.apply(this, args);
+  };
+}
+
+patchSocketConnect(net, "connect", "net.connect");
+patchSocketConnect(net, "createConnection", "net.createConnection");
+patchSocketConnect(tls, "connect", "tls.connect");
