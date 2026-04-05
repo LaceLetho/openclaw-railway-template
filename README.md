@@ -18,6 +18,7 @@ This repo packages **OpenClaw** for Railway with a minimal reverse proxy wrapper
 - Third-party webhook ingress that has its own auth is forwarded without Basic Auth: `/hooks`, `/feishu/events`, and Telegram webhook traffic on `/telegram-webhook` by default.
 - **OpenClaw is initialized manually via SSH** — run `openclaw onboard` once after first deploy.
 - After initialization, the wrapper auto-starts the OpenClaw gateway on every boot and reverse-proxies all traffic (including WebSockets) to it.
+- The template enables Railway Serverless/App Sleeping by default via `sleepApplication = true`.
 
 ## Onboarding guide
 
@@ -166,6 +167,9 @@ TELEGRAM_WEBHOOK_PORT=8787
 ```
 
 Then redeploy the service so the wrapper picks up the new env vars.
+
+### Serverless caveats
+Railway only puts the service to sleep after at least 10 minutes with no outbound packets. In practice, this means open dashboards, WebSocket clients, other Railway services calling this service, or plugins/channels that keep long-lived outbound connections can keep the service awake even when `sleepApplication = true` is enabled.
 
 ### Hook sessions keep multiplying
 If you use hooks heavily, consider pinning a default session key:

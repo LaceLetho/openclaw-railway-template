@@ -5,6 +5,7 @@ builder = "dockerfile"
 healthcheckPath = "/healthz"
 healthcheckTimeout = 300
 restartPolicyType = "on_failure"
+sleepApplication = true
 
 # Require a persistent volume mounted at /data (Railway).
 requiredMountPath = "/data"
