@@ -15,6 +15,7 @@ This repo packages **OpenClaw** for Railway with a minimal reverse proxy wrapper
 
 - The container runs a small Express wrapper server.
 - The wrapper protects all routes (except `/healthz`) with HTTP Basic Auth using the `PASSWORD` env var.
+- Third-party webhook ingress that has its own auth is forwarded without Basic Auth: `/hooks`, `/feishu/events`, and Telegram webhook traffic on `/telegram-webhook` by default.
 - **OpenClaw is initialized manually via SSH** — run `openclaw onboard` once after first deploy.
 - After initialization, the wrapper auto-starts the OpenClaw gateway on every boot and reverse-proxies all traffic (including WebSockets) to it.
 
@@ -141,6 +142,30 @@ openclaw config set --json plugins.allow '["telegram","feishu","<your-plugin-id>
 
 ### Telegram group allowlist gotcha
 `channels.telegram.allowFrom` / `groupAllowFrom` expect **Telegram user IDs**, not group chat IDs. To allow a group or supergroup, configure it under `channels.telegram.groups` and set the per-group policy there.
+
+### Telegram webhook mode on Railway
+If you switch Telegram from polling to webhook mode, configure both OpenClaw and the wrapper to agree on the webhook listener path/port:
+
+```bash
+# Public URL Telegram will call
+openclaw config set channels.telegram.webhookUrl "https://<your-domain>/telegram-webhook"
+
+# Secret Telegram sends back in X-Telegram-Bot-Api-Secret-Token
+openclaw config set channels.telegram.webhookSecret "<random-secret>"
+
+# Optional when you want to customize the local listener
+openclaw config set channels.telegram.webhookPath "/telegram-webhook"
+openclaw config set channels.telegram.webhookPort 8787
+```
+
+The Railway wrapper in this template forwards `/telegram-webhook` to `127.0.0.1:8787` by default. If you customize those values, set matching Railway variables:
+
+```bash
+TELEGRAM_WEBHOOK_PATH=/telegram-webhook
+TELEGRAM_WEBHOOK_PORT=8787
+```
+
+Then redeploy the service so the wrapper picks up the new env vars.
 
 ### Hook sessions keep multiplying
 If you use hooks heavily, consider pinning a default session key:

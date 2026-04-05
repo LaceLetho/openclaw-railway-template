@@ -65,6 +65,9 @@ const GATEWAY_TARGET = `http://${INTERNAL_GATEWAY_HOST}:${INTERNAL_GATEWAY_PORT}
 // Must match channels.feishu.webhookPort in openclaw config (default: 3000).
 const FEISHU_WEBHOOK_PORT = Number.parseInt(process.env.FEISHU_WEBHOOK_PORT ?? "3000", 10);
 const FEISHU_WEBHOOK_TARGET = `http://127.0.0.1:${FEISHU_WEBHOOK_PORT}`;
+const TELEGRAM_WEBHOOK_PORT = Number.parseInt(process.env.TELEGRAM_WEBHOOK_PORT ?? "8787", 10);
+const TELEGRAM_WEBHOOK_TARGET = `http://127.0.0.1:${TELEGRAM_WEBHOOK_PORT}`;
+const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH?.trim() || "/telegram-webhook";
 
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
@@ -329,6 +332,7 @@ const DASHBOARD_PASSWORD = process.env.PASSWORD?.trim();
 const PUBLIC_PATHS = [
   "/healthz",
   "/feishu/events", // Lark/Feishu webhook — verified by gateway via X-Lark-Signature
+  TELEGRAM_WEBHOOK_PATH, // Telegram webhook — verified by X-Telegram-Bot-Api-Secret-Token
   "/hooks", // OpenClaw hooks — verified by gateway via token
 ];
 
@@ -410,6 +414,7 @@ proxy.on("proxyReqWs", (_proxyReq, req) => {
 // Content-Type: the Lark SDK returns text/plain for challenge responses, but Lark
 // platform requires application/json or it rejects with "not valid JSON format".
 const feishuProxy = httpProxy.createProxyServer({ target: FEISHU_WEBHOOK_TARGET });
+const telegramProxy = httpProxy.createProxyServer({ target: TELEGRAM_WEBHOOK_TARGET });
 
 feishuProxy.on("error", (err, _req, res) => {
   console.error("[feishu-proxy]", err);
@@ -430,12 +435,27 @@ feishuProxy.on("proxyRes", (proxyRes) => {
   }
 });
 
+telegramProxy.on("error", (err, _req, res) => {
+  console.error("[telegram-proxy]", err);
+  try {
+    if (res && typeof res.writeHead === "function" && !res.headersSent) {
+      res.writeHead(502, { "Content-Type": "text/plain" });
+      res.end("Telegram webhook server unavailable\n");
+    }
+  } catch {
+    // ignore
+  }
+});
+
 // Route Feishu/Lark webhook events to the feishu channel's standalone HTTP server.
 // NOTE: must NOT use app.use("/feishu", ...) — Express strips the matched prefix
 // from req.url, so the proxy would forward /events instead of /feishu/events.
 app.use((req, res, next) => {
   if (req.path === "/feishu" || req.path.startsWith("/feishu/")) {
     return feishuProxy.web(req, res);
+  }
+  if (req.path === TELEGRAM_WEBHOOK_PATH || req.path.startsWith(TELEGRAM_WEBHOOK_PATH + "/")) {
+    return telegramProxy.web(req, res);
   }
   return next();
 });
