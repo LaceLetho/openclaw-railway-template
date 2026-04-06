@@ -68,7 +68,6 @@ const FEISHU_WEBHOOK_TARGET = `http://127.0.0.1:${FEISHU_WEBHOOK_PORT}`;
 const TELEGRAM_WEBHOOK_PORT = Number.parseInt(process.env.TELEGRAM_WEBHOOK_PORT ?? "8787", 10);
 const TELEGRAM_WEBHOOK_TARGET = `http://127.0.0.1:${TELEGRAM_WEBHOOK_PORT}`;
 const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH?.trim() || "/telegram-webhook";
-const TELEGRAM_TRACE_HOOK = path.join(path.dirname(new URL(import.meta.url).pathname), "telegram-trace-hook.cjs");
 const OPENCLAW_RUNTIME_PATCH_HOOK = path.join(
   path.dirname(new URL(import.meta.url).pathname),
   "openclaw-runtime-patch.cjs",
@@ -97,10 +96,6 @@ function buildOpenClawEnv(extraEnv = {}) {
 
   if (env.OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH === "1") {
     requiredHooks.push(OPENCLAW_RUNTIME_PATCH_HOOK);
-  }
-
-  if (env.OPENCLAW_TRACE_TELEGRAM_API === "1") {
-    requiredHooks.push(TELEGRAM_TRACE_HOOK);
   }
 
   if (requiredHooks.length > 0) {
