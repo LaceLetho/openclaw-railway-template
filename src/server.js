@@ -69,6 +69,10 @@ const TELEGRAM_WEBHOOK_PORT = Number.parseInt(process.env.TELEGRAM_WEBHOOK_PORT 
 const TELEGRAM_WEBHOOK_TARGET = `http://127.0.0.1:${TELEGRAM_WEBHOOK_PORT}`;
 const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH?.trim() || "/telegram-webhook";
 const TELEGRAM_TRACE_HOOK = path.join(path.dirname(new URL(import.meta.url).pathname), "telegram-trace-hook.cjs");
+const OPENCLAW_RUNTIME_PATCH_HOOK = path.join(
+  path.dirname(new URL(import.meta.url).pathname),
+  "openclaw-runtime-patch.cjs",
+);
 
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
@@ -89,12 +93,22 @@ function buildOpenClawEnv(extraEnv = {}) {
     ...extraEnv,
   };
 
-  if (process.env.OPENCLAW_TRACE_TELEGRAM_API === "1") {
+  const requiredHooks = [];
+
+  if (env.OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH === "1") {
+    requiredHooks.push(OPENCLAW_RUNTIME_PATCH_HOOK);
+  }
+
+  if (env.OPENCLAW_TRACE_TELEGRAM_API === "1") {
+    requiredHooks.push(TELEGRAM_TRACE_HOOK);
+  }
+
+  if (requiredHooks.length > 0) {
     const existingNodeOptions = env.NODE_OPTIONS?.trim();
-    const traceRequire = `--require ${TELEGRAM_TRACE_HOOK}`;
+    const requireFlags = requiredHooks.map((hookPath) => `--require ${hookPath}`).join(" ");
     env.NODE_OPTIONS = existingNodeOptions
-      ? `${existingNodeOptions} ${traceRequire}`
-      : traceRequire;
+      ? `${existingNodeOptions} ${requireFlags}`
+      : requireFlags;
   }
 
   return env;
