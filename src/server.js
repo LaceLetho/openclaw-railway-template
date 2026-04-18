@@ -18,6 +18,20 @@ for (const suffix of ["PUBLIC_PORT", "STATE_DIR", "WORKSPACE_DIR", "GATEWAY_TOKE
   delete process.env[oldKey];
 }
 
+const BUNDLED_OPENCLAW_BIN_DIR = "/usr/local/bin";
+const PERSISTED_GLOBAL_OPENCLAW_BIN = "/data/npm/bin/openclaw";
+const PERSISTED_GLOBAL_OPENCLAW_PKG_DIR = "/data/npm/lib/node_modules/openclaw";
+
+function preferBundledOpenClawPath(pathValue = process.env.PATH ?? "") {
+  const entries = pathValue
+    .split(path.delimiter)
+    .filter(Boolean)
+    .filter((entry) => entry !== BUNDLED_OPENCLAW_BIN_DIR);
+  return [BUNDLED_OPENCLAW_BIN_DIR, ...entries].join(path.delimiter);
+}
+
+process.env.PATH = preferBundledOpenClawPath();
+
 // Railway injects PORT at runtime and routes traffic to that port.
 const PORT = Number.parseInt(process.env.PORT ?? process.env.OPENCLAW_PUBLIC_PORT ?? "3000", 10);
 
@@ -344,6 +358,28 @@ function runCmd(cmd, args, opts = {}) {
   });
 }
 
+async function removePersistedGlobalOpenClaw() {
+  if (!fs.existsSync(PERSISTED_GLOBAL_OPENCLAW_BIN)) return;
+
+  console.log(`[wrapper] removing persisted global openclaw: ${PERSISTED_GLOBAL_OPENCLAW_BIN}`);
+  const uninstall = await runCmd("npm", ["uninstall", "-g", "openclaw"], {
+    timeoutMs: 60_000,
+    env: { PATH: preferBundledOpenClawPath(process.env.PATH) },
+  });
+
+  if (uninstall.code !== 0) {
+    console.warn(`[wrapper] npm uninstall -g openclaw exited with code ${uninstall.code}`);
+  }
+
+  for (const stalePath of [PERSISTED_GLOBAL_OPENCLAW_BIN, PERSISTED_GLOBAL_OPENCLAW_PKG_DIR]) {
+    try {
+      fs.rmSync(stalePath, { recursive: true, force: true });
+    } catch (err) {
+      console.warn(`[wrapper] failed to remove stale openclaw path ${stalePath}: ${String(err)}`);
+    }
+  }
+}
+
 // Protect the dashboard with a password (HTTP Basic Auth).
 // Set PASSWORD in Railway Variables. Without it the service starts but all non-healthz
 // requests are rejected with a 401 to prevent open access.
@@ -501,6 +537,7 @@ const server = app.listen(PORT, "0.0.0.0", async () => {
   try { fs.mkdirSync(path.join(STATE_DIR, "credentials"), { recursive: true }); } catch {}
   try { fs.chmodSync(path.join(STATE_DIR, "credentials"), 0o700); } catch {}
   try { fs.chmodSync(STATE_DIR, 0o700); } catch {}
+  await removePersistedGlobalOpenClaw();
 
   console.log(`[wrapper] gateway token: ${OPENCLAW_GATEWAY_TOKEN ? "(set)" : "(missing)"}`);
   console.log(`[wrapper] gateway target: ${GATEWAY_TARGET}`);
