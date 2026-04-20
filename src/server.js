@@ -108,7 +108,10 @@ function buildOpenClawEnv(extraEnv = {}) {
 
   const requiredHooks = [];
 
-  if (env.OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH === "1") {
+  if (
+    env.OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH === "1" ||
+    env.OPENCLAW_DISABLE_OPENROUTER_MODEL_CATALOG === "1"
+  ) {
     requiredHooks.push(OPENCLAW_RUNTIME_PATCH_HOOK);
   }
 
