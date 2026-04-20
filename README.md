@@ -92,11 +92,13 @@ railway redeploy
 
 ## Upgrading OpenClaw
 
-To upgrade to a newer version of OpenClaw, update the `OPENCLAW_GIT_REF` environment variable in Railway and redeploy:
+This template builds OpenClaw from the fixed Railway fork branch:
 
-1. Go to your Railway service → **Variables**
-2. Set `OPENCLAW_GIT_REF` to the desired version tag (e.g. `v2026.3.8`)
-3. Redeploy the service — Railway will rebuild the Docker image from that git ref
+```text
+https://github.com/LaceLetho/openclaw-railway.git#lace
+```
+
+To pick up newer OpenClaw changes, update that `lace` branch in the fork and redeploy the Railway service. Railway will rebuild the Docker image from the branch tip.
 
 Your persistent state (config, credentials, memory) on the Railway Volume is unaffected by upgrades.
 
