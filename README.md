@@ -170,23 +170,10 @@ TELEGRAM_WEBHOOK_PORT=8787
 
 Then redeploy the service so the wrapper picks up the new env vars.
 
-If you want Railway serverless sleeping to work with Telegram webhook mode, also set:
-
-```bash
-OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH=1
-OPENCLAW_DISABLE_OPENROUTER_MODEL_CATALOG=1
-```
-
-Why this exists:
-
-- OpenClaw gateway runs a background health refresh every 60 seconds.
-- That refresh uses `probe: true`, which triggers Telegram health probes.
-- Telegram health probes call `getMe` and `getWebhookInfo`, producing outbound traffic even when no user is using the service.
-- Railway serverless will not sleep while the service keeps emitting outbound packets.
-
-This template includes a runtime compatibility patch for Railway. When `OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH=1` is set, the wrapper suppresses that background `probe: true` interval while preserving normal Telegram webhook startup and explicit health checks.
-
-When `OPENCLAW_DISABLE_OPENROUTER_MODEL_CATALOG=1` is set, the wrapper also suppresses background fetches to `https://openrouter.ai/api/v1/models`. This avoids Railway serverless wakeups caused by OpenClaw's gateway model-pricing bootstrap for OpenRouter-compatible catalog entries.
+This template builds the Railway-maintained OpenClaw fork. That fork keeps Railway serverless
+sleeping compatible with Telegram webhook mode by avoiding channel probes during background
+gateway health refreshes, closing idle Telegram Bot API transports, and allowing OpenRouter model
+pricing bootstrap fetches to be disabled in OpenClaw itself.
 
 ### Serverless caveats
 Railway only puts the service to sleep after at least 10 minutes with no outbound packets. In practice, this means open dashboards, WebSocket clients, other Railway services calling this service, or plugins/channels that keep long-lived outbound connections can keep the service awake even when `sleepApplication = true` is enabled.

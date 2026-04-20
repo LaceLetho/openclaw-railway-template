@@ -82,10 +82,6 @@ const FEISHU_WEBHOOK_TARGET = `http://127.0.0.1:${FEISHU_WEBHOOK_PORT}`;
 const TELEGRAM_WEBHOOK_PORT = Number.parseInt(process.env.TELEGRAM_WEBHOOK_PORT ?? "8787", 10);
 const TELEGRAM_WEBHOOK_TARGET = `http://127.0.0.1:${TELEGRAM_WEBHOOK_PORT}`;
 const TELEGRAM_WEBHOOK_PATH = process.env.TELEGRAM_WEBHOOK_PATH?.trim() || "/telegram-webhook";
-const OPENCLAW_RUNTIME_PATCH_HOOK = path.join(
-  path.dirname(new URL(import.meta.url).pathname),
-  "openclaw-runtime-patch.cjs",
-);
 
 const OPENCLAW_ENTRY = process.env.OPENCLAW_ENTRY?.trim() || "/openclaw/dist/entry.js";
 const OPENCLAW_NODE = process.env.OPENCLAW_NODE?.trim() || "node";
@@ -105,24 +101,6 @@ function buildOpenClawEnv(extraEnv = {}) {
     OPENCLAW_WORKSPACE_DIR: WORKSPACE_DIR,
     ...extraEnv,
   };
-
-  const requiredHooks = [];
-
-  if (
-    env.OPENCLAW_DISABLE_BACKGROUND_PROBED_HEALTH === "1" ||
-    env.OPENCLAW_DISABLE_OPENROUTER_MODEL_CATALOG === "1"
-  ) {
-    requiredHooks.push(OPENCLAW_RUNTIME_PATCH_HOOK);
-  }
-
-  if (requiredHooks.length > 0) {
-    const existingNodeOptions = env.NODE_OPTIONS?.trim();
-    const requireFlags = requiredHooks.map((hookPath) => `--require ${hookPath}`).join(" ");
-    env.NODE_OPTIONS = existingNodeOptions
-      ? `${existingNodeOptions} ${requireFlags}`
-      : requireFlags;
-  }
-
   return env;
 }
 
