@@ -22,6 +22,7 @@ WORKDIR /openclaw
 
 # Build from the Railway-maintained fork and branch.
 RUN git clone --depth 1 --branch lace https://github.com/LaceLetho/openclaw-railway.git .
+RUN git rev-parse HEAD
 
 # Patch: relax version requirements for packages that may reference unpublished versions.
 # Apply to all extension package.json files to handle workspace protocol (workspace:*).
