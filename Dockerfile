@@ -32,6 +32,8 @@ RUN set -eux; \
     sed -i -E 's/"openclaw"[[:space:]]*:[[:space:]]*"workspace:[^"]+"/"openclaw": "*"/g' "$f"; \
   done
 
+# Relax minimumReleaseAge for rastermill (new releases may not be 48h old yet).
+RUN sed -i '/minimumReleaseAgeExclude:/a \ \ - "rastermill"' pnpm-workspace.yaml
 RUN pnpm install --no-frozen-lockfile
 RUN pnpm build
 ENV OPENCLAW_PREFER_PNPM=1
